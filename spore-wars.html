@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPORE WARS</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;800&family=Nunito:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0d1b2a;--accent:#f72585;--teal:#4cc9f0;--yellow:#f9c74f;
+  --green:#90be6d;--orange:#f8961e;--purple:#c77dff;
+  --font-head:'Baloo 2',cursive;--font-body:'Nunito',sans-serif;
+}
+body{background:var(--bg);font-family:var(--font-body);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;user-select:none;}
+#gameCanvas{border-radius:50%;cursor:none;box-shadow:0 0 80px rgba(76,201,240,0.15),0 0 200px rgba(247,37,133,0.08);}
+#hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:12px 24px;pointer-events:none;z-index:10;}
+.hud-pill{background:rgba(13,27,42,0.9);border:1.5px solid rgba(255,255,255,0.1);border-radius:50px;padding:6px 16px;font-family:var(--font-head);font-weight:800;font-size:14px;backdrop-filter:blur(10px);}
+.hud-label{color:rgba(255,255,255,0.4);font-size:10px;display:block;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+.hud-val{color:#fff;font-size:18px;font-family:var(--font-head);font-weight:800;}
+#massBar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:min(400px,90vw);background:rgba(0,0,0,0.4);border-radius:50px;height:12px;border:1.5px solid rgba(255,255,255,0.1);overflow:hidden;z-index:10;}
+#massBarFill{height:100%;border-radius:50px;background:linear-gradient(90deg,#4cc9f0,#f72585);transition:width 0.3s ease;}
+#comboDisplay{position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;pointer-events:none;opacity:0;transition:opacity 0.3s;}
+#comboDisplay.show{opacity:1;}
+#comboText{font-family:var(--font-head);font-weight:800;font-size:clamp(20px,5vw,36px);color:#f9c74f;text-shadow:0 0 20px #f9c74f;}
+#levelUpBanner{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:25;opacity:0;transition:opacity 0.2s;}
+#levelUpBanner.show{opacity:1;}
+#levelUpText{font-family:var(--font-head);font-weight:800;font-size:clamp(32px,8vw,64px);background:linear-gradient(135deg,#f9c74f,#f8961e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+/* Joystick */
+#joystick{position:fixed;bottom:110px;left:30px;z-index:10;display:none;}
+#joystickBase{width:90px;height:90px;background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.15);border-radius:50%;}
+#joystickKnob{position:absolute;width:36px;height:36px;background:rgba(76,201,240,0.6);border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);border:2px solid rgba(76,201,240,0.9);transition:transform 0.05s;}
+@media(hover:none){#joystick{display:block;}}
+#mutationBanner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:20;opacity:0;transition:opacity 0.3s;}
+#mutationBanner.show{opacity:1;}
+#mutationTitle{font-family:var(--font-head);font-size:clamp(28px,6vw,56px);font-weight:800;line-height:1;}
+#mutationDesc{font-size:clamp(12px,2vw,16px);color:rgba(255,255,255,0.7);margin-top:6px;}
+#mutationTimer{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10;}
+#mutationTimer svg{width:60px;height:60px;}
+#mutTimerText{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-head);font-weight:800;font-size:14px;color:#fff;}
+#abilityBar{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:10;}
+.ability-slot{width:52px;height:52px;background:rgba(13,27,42,0.9);border:2px solid rgba(255,255,255,0.15);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;cursor:pointer;pointer-events:all;position:relative;transition:border-color 0.2s,transform 0.1s;}
+.ability-slot:hover{transform:scale(1.08);border-color:rgba(255,255,255,0.4);}
+.key-hint{position:absolute;bottom:2px;right:5px;font-size:8px;color:rgba(255,255,255,0.4);}
+.cd-overlay{position:absolute;inset:0;border-radius:12px;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-family:var(--font-head);font-weight:800;}
+.cd-overlay.hidden{display:none;}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;gap:20px;background:radial-gradient(ellipse at center,#1a2a3a 0%,#0a0f18 100%);}
+.screen.hidden{display:none;}
+.game-title{font-family:var(--font-head);font-weight:800;font-size:clamp(48px,12vw,100px);line-height:0.9;background:linear-gradient(135deg,#4cc9f0 0%,#f72585 50%,#f9c74f 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 30px rgba(247,37,133,0.4));}
+.tagline{font-size:clamp(12px,2.5vw,18px);color:rgba(255,255,255,0.5);letter-spacing:0.2em;text-transform:uppercase;font-weight:700;}
+.btn-start{background:linear-gradient(135deg,#f72585,#7b2d8b);border:none;color:#fff;font-family:var(--font-head);font-weight:800;font-size:clamp(16px,3vw,22px);padding:16px 48px;border-radius:50px;cursor:pointer;letter-spacing:0.05em;box-shadow:0 8px 40px rgba(247,37,133,0.4);transition:transform 0.15s,box-shadow 0.15s;}
+.btn-start:hover{transform:scale(1.05);box-shadow:0 12px 60px rgba(247,37,133,0.6);}
+.controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:380px;width:90%;}
+.ctrl-item{background:rgba(255,255,255,0.05);border-radius:12px;padding:10px 14px;font-size:12px;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:8px;}
+.ctrl-key{background:rgba(255,255,255,0.15);border-radius:6px;padding:3px 8px;font-family:var(--font-head);font-weight:800;font-size:13px;color:#fff;min-width:28px;text-align:center;}
+#finalScore{font-family:var(--font-head);font-weight:800;font-size:clamp(60px,15vw,120px);background:linear-gradient(135deg,#f9c74f,#f72585);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.stat-row{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;}
+.stat-box{background:rgba(255,255,255,0.05);border-radius:16px;padding:14px 24px;text-align:center;min-width:100px;}
+.stat-box .sv{font-family:var(--font-head);font-weight:800;font-size:28px;color:#fff;}
+.stat-box .sl{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;margin-top:2px;}
+.bg-particle{position:fixed;border-radius:50%;pointer-events:none;animation:floatUp linear infinite;opacity:0.3;}
+@keyframes floatUp{from{transform:translateY(110vh) scale(0.5);opacity:0.1;}50%{opacity:0.35;}to{transform:translateY(-10vh) scale(1.2);opacity:0;}}
+</style>
+</head>
+<body>
+<div id="bgParticles"></div>
+<canvas id="gameCanvas"></canvas>
+<div id="hud">
+  <div class="hud-pill"><span class="hud-label">Score</span><span class="hud-val" id="hudScore">0</span></div>
+  <div id="mutationTimer">
+    <svg viewBox="0 0 60 60">
+      <circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+      <circle id="timerArc" cx="30" cy="30" r="26" fill="none" stroke="#4cc9f0" stroke-width="4" stroke-dasharray="163.4" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 30 30)" style="transition:stroke-dashoffset 0.5s linear,stroke 0.5s"/>
+    </svg>
+    <div id="mutTimerText">10</div>
+  </div>
+  <div class="hud-pill"><span class="hud-label">Best</span><span class="hud-val" id="hudBest">0</span></div>
+</div>
+<div id="massBar"><div id="massBarFill" style="width:20%"></div></div>
+<div id="comboDisplay"><div id="comboText"></div></div>
+<div id="levelUpBanner"><div id="levelUpText">LEVEL UP!</div></div>
+<div id="joystick"><div id="joystickBase"><div id="joystickKnob"></div></div></div>
+<div id="abilityBar">
+  <div class="ability-slot" id="slot-camouflage" onclick="useAbility('camouflage')">🫥<span class="key-hint">Q</span><div class="cd-overlay hidden" id="cd-camouflage"></div></div>
+  <div class="ability-slot" id="slot-spore" onclick="useAbility('spore')">💥<span class="key-hint">E</span><div class="cd-overlay hidden" id="cd-spore"></div></div>
+  <div class="ability-slot" id="slot-burst" onclick="useAbility('burst')">⚡<span class="key-hint">R</span><div class="cd-overlay hidden" id="cd-burst"></div></div>
+</div>
+<div id="mutationBanner">
+  <div id="mutationTitle"></div>
+  <div id="mutationDesc"></div>
+</div>
+
+<div class="screen" id="startScreen">
+  <div class="game-title">SPORE<br>WARS</div>
+  <div class="tagline">Survive · Absorb · Mutate</div>
+  <button class="btn-start" onclick="startGame()">ENTER THE DISH</button>
+  <div class="controls-grid">
+    <div class="ctrl-item"><span class="ctrl-key">Mouse</span>Move your cell</div>
+    <div class="ctrl-item"><span class="ctrl-key">Q</span>Camouflage</div>
+    <div class="ctrl-item"><span class="ctrl-key">E</span>Spore Bomb</div>
+    <div class="ctrl-item"><span class="ctrl-key">R</span>Speed Burst</div>
+  </div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.3);text-align:center;max-width:320px">Every 10s a MUTATION EVENT changes the rules.<br>Absorb smaller cells. Flee larger ones. Survive!</div>
+</div>
+
+<div class="screen hidden" id="gameOverScreen">
+  <div style="font-family:var(--font-head);font-weight:800;font-size:clamp(24px,5vw,40px);color:rgba(255,255,255,0.6)">YOU DISSOLVED</div>
+  <div id="finalScore">0</div>
+  <div class="stat-row">
+    <div class="stat-box"><div class="sv" id="goTime">0s</div><div class="sl">Survived</div></div>
+    <div class="stat-box"><div class="sv" id="goAbsorbed">0</div><div class="sl">Absorbed</div></div>
+    <div class="stat-box"><div class="sv" id="goMutations">0</div><div class="sl">Mutations</div></div>
+  </div>
+  <div id="newRecordMsg" style="display:none;font-family:var(--font-head);font-size:16px;color:#f9c74f;text-shadow:0 0 20px #f9c74f;letter-spacing:.1em">🏆 NEW BEST SCORE!</div>
+  <button class="btn-start" onclick="startGame()">RESPAWN</button>
+</div>
+
+<script>
+// Background particles
+const bgP=document.getElementById('bgParticles');
+const COLORS=['#f72585','#4cc9f0','#f9c74f','#90be6d','#7b2d8b','#f8961e'];
+for(let i=0;i<18;i++){
+  const d=document.createElement('div');d.className='bg-particle';
+  const s=Math.random()*20+8;
+  d.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;background:${COLORS[i%COLORS.length]};animation-duration:${Math.random()*12+8}s;animation-delay:${Math.random()*-15}s`;
+  bgP.appendChild(d);
+}
+
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const W=Math.min(window.innerWidth,window.innerHeight,700);
+canvas.width=canvas.height=W;
+canvas.style.width=canvas.style.height=W+'px';
+
+let state='menu',player,cells,spores,parts,floatingTexts=[];
+let score,startTime,absorbed,mutationCount;
+let mutTimer,mutInterval,currentMut=null;
+let mouse={x:W/2,y:W/2};
+let abCDs={camouflage:0,spore:0,burst:0};
+let animId;
+let combo=0,comboTimer=0,level=1,bestScore=parseInt(localStorage.getItem('sporeWarsBest')||'0');
+let joystickActive=false,joystickDX=0,joystickDY=0;
+document.getElementById('hudBest').textContent=bestScore;
+
+const PALETTE=['#f72585','#4cc9f0','#f9c74f','#90be6d','#f8961e','#c77dff','#ff9f1c','#2ec4b6'];
+const rc=()=>PALETTE[Math.floor(Math.random()*PALETTE.length)];
+
+const MUTATIONS=[
+  {id:'gravity',name:'🌀 GRAVITY FLIP',desc:'All cells pulled to center!',color:'#c77dff',
+    onTick(c){const dx=W/2-c.x,dy=W/2-c.y,d=Math.hypot(dx,dy)||1;c.vx+=dx/d*0.25;c.vy+=dy/d*0.25;}},
+  {id:'feast',name:'🍖 FEAST MODE',desc:'Nutrients rain from the dish!',color:'#90be6d',
+    onStart(){for(let i=0;i<30;i++)spawnNutrient();}},
+  {id:'virus',name:'🦠 VIRUS STORM',desc:'Toxic spores fill the petri dish!',color:'#f72585',
+    onStart(){for(let i=0;i<10;i++)spawnVirus();}},
+  {id:'speed',name:'⚡ HYPERDRIVE',desc:'Everyone moves double speed!',color:'#f9c74f',modifier:{speedMult:2}},
+  {id:'shrink',name:'🔬 MICRO WORLD',desc:'All cells slowly shrink!',color:'#4cc9f0',
+    onTick(c){c.r=Math.max(4,c.r*0.9988);}},
+  {id:'ghost',name:'👻 GHOST PHASE',desc:'Cells phase through each other!',color:'#a8dadc',modifier:{noCollision:true}},
+  {id:'split',name:'💥 CELL DIVISION',desc:'Every cell divides in two!',color:'#f8961e',
+    onStart(){splitAll();}},
+  {id:'rainbow',name:'🌈 CHROMASHIFT',desc:'All cells change color!',color:'#ff9f1c',
+    onStart(){cells.forEach(c=>c.color=rc());player.color=rc();}}
+];
+
+function startGame(){
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  state='playing';
+  player={x:W/2,y:W/2,r:22,vx:0,vy:0,color:'#4cc9f0',camouflaged:0,burstTime:0};
+  cells=[];spores=[];parts=[];floatingTexts=[];
+  score=0;startTime=Date.now();absorbed=0;mutationCount=0;currentMut=null;
+  combo=0;comboTimer=0;level=1;
+  abCDs={camouflage:0,spore:0,burst:0};
+  for(let i=0;i<22;i++)spawnCell();
+  for(let i=0;i<40;i++)spawnNutrient();
+  mutTimer=10;clearInterval(mutInterval);
+  mutInterval=setInterval(()=>{mutTimer--;updateTimerUI();if(mutTimer<=0){triggerMutation();mutTimer=10;}},1000);
+  cancelAnimationFrame(animId);loop();
+}
+
+function spawnCell(){
+  const side=Math.floor(Math.random()*4);
+  let x,y;const m=50;
+  if(side===0){x=Math.random()*W;y=-m;}
+  else if(side===1){x=W+m;y=Math.random()*W;}
+  else if(side===2){x=Math.random()*W;y=W+m;}
+  else{x=-m;y=Math.random()*W;}
+  const r=Math.random()*20+6;
+  cells.push({x,y,r,vx:(Math.random()-.5)*1.5,vy:(Math.random()-.5)*1.5,color:rc(),type:r>18?'predator':'prey',camouflaged:0});
+}
+
+function spawnNutrient(){
+  spores.push({x:Math.random()*(W-40)+20,y:Math.random()*(W-40)+20,r:4+Math.random()*5,color:rc(),type:'nutrient',pulse:Math.random()*Math.PI*2});
+}
+function spawnVirus(){
+  spores.push({x:Math.random()*(W-80)+40,y:Math.random()*(W-80)+40,r:9,color:'#ff006e',type:'virus',life:300});
+}
+function splitAll(){
+  const add=[];
+  cells.forEach(c=>{if(c.r>8){c.r*=0.7;add.push({x:c.x+(Math.random()-.5)*20,y:c.y+(Math.random()-.5)*20,r:c.r*.7,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2,color:c.color,type:c.type,camouflaged:0});}});
+  player.r=Math.max(12,player.r*0.7);cells.push(...add);
+}
+
+function triggerMutation(){
+  mutationCount++;
+  const m=MUTATIONS[Math.floor(Math.random()*MUTATIONS.length)];
+  currentMut=m;if(m.onStart)m.onStart();
+  const b=document.getElementById('mutationBanner');
+  document.getElementById('mutationTitle').textContent=m.name;
+  document.getElementById('mutationTitle').style.color=m.color;
+  document.getElementById('mutationDesc').textContent=m.desc;
+  b.classList.add('show');
+  for(let i=0;i<30;i++)parts.push(mkPart(W/2,W/2,m.color));
+  setTimeout(()=>b.classList.remove('show'),2500);
+  setTimeout(()=>{currentMut=null;},9000);
+}
+
+function updateTimerUI(){
+  document.getElementById('mutTimerText').textContent=mutTimer;
+  const arc=document.getElementById('timerArc');
+  const pct=mutTimer/10;
+  arc.style.strokeDashoffset=163.4*(1-pct);
+  arc.style.stroke=pct>.5?'#4cc9f0':pct>.25?'#f9c74f':'#f72585';
+}
+
+function mkPart(x,y,color){
+  return {x,y,color,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,r:Math.random()*4+2,life:1};
+}
+
+function loop(){
+  if(state!=='playing')return;
+  update();draw();animId=requestAnimationFrame(loop);
+}
+
+function update(){
+  const m=currentMut;
+  const sm=(m?.modifier?.speedMult||1)*(player.burstTime>0?2.2:1);
+  const dx=mouse.x-player.x,dy=mouse.y-player.y,dist=Math.hypot(dx,dy)||1;
+  const spd=(3.5-player.r*.04)*sm;
+  if(dist>3){player.x+=dx/dist*spd;player.y+=dy/dist*spd;}
+  player.x=Math.max(player.r,Math.min(W-player.r,player.x));
+  player.y=Math.max(player.r,Math.min(W-player.r,player.y));
+  if(player.burstTime>0)player.burstTime--;
+  if(player.camouflaged>0)player.camouflaged--;
+
+  const nc=m?.modifier?.noCollision;
+  cells.forEach(c=>{
+    if(m?.onTick)m.onTick(c);
+    const cs=(1.5-c.r*.02)*(m?.modifier?.speedMult||1);
+    let fx=0,fy=0;
+    if(!nc){
+      const d2=Math.hypot(player.x-c.x,player.y-c.y)||1;
+      if(c.r<player.r*.9&&player.camouflaged<=0&&d2<130){fx-=(player.x-c.x)/d2*2;fy-=(player.y-c.y)/d2*2;}
+      else if(c.r>player.r*1.1&&d2<200){fx+=(player.x-c.x)/d2*1.2;fy+=(player.y-c.y)/d2*1.2;}
+    }
+    c.vx=c.vx*.9+fx*.15+(Math.random()-.5)*.2;
+    c.vy=c.vy*.9+fy*.15+(Math.random()-.5)*.2;
+    const sp=Math.hypot(c.vx,c.vy)||1;if(sp>cs){c.vx=c.vx/sp*cs;c.vy=c.vy/sp*cs;}
+    c.x+=c.vx;c.y+=c.vy;
+    if(c.x<c.r){c.x=c.r;c.vx*=-1;}if(c.x>W-c.r){c.x=W-c.r;c.vx*=-1;}
+    if(c.y<c.r){c.y=c.r;c.vy*=-1;}if(c.y>W-c.r){c.y=W-c.r;c.vy*=-1;}
+  });
+
+  spores.forEach(s=>{if(s.pulse!==undefined)s.pulse+=.05;if(s.life!==undefined)s.life--;});
+
+  if(!nc){
+    spores=spores.filter(s=>{
+      if(s.type==='virus'){
+        if(s.life<=0)return false;
+        const d=Math.hypot(player.x-s.x,player.y-s.y);
+        if(d<player.r+s.r){player.r=Math.max(10,player.r*.8);for(let i=0;i<10;i++)parts.push(mkPart(player.x,player.y,'#ff006e'));return false;}
+        return true;
+      }
+      const d=Math.hypot(player.x-s.x,player.y-s.y);
+      if(d<player.r+s.r){player.r+=s.r*.15;score+=Math.ceil(s.r);absorbed++;for(let i=0;i<5;i++)parts.push(mkPart(s.x,s.y,s.color));return false;}
+      return true;
+    });
+    while(spores.filter(s=>s.type==='nutrient').length<35)spawnNutrient();
+
+    let dead=false;
+    cells=cells.filter(c=>{
+      const d=Math.hypot(player.x-c.x,player.y-c.y);
+      if(d<player.r+c.r-Math.min(player.r,c.r)*.5){
+        if(player.r>c.r*1.05){
+          combo++;comboTimer=120;
+          const mult=Math.min(combo,5);
+          const gain=Math.ceil(c.r*2)*mult;
+          player.r+=c.r*.25;score+=gain;absorbed++;
+          for(let i=0;i<12;i++)parts.push(mkPart(c.x,c.y,c.color));
+          floatingTexts.push({x:c.x,y:c.y,text:combo>1?`x${combo} +${gain}`:`+${gain}`,color:combo>2?'#f9c74f':'#fff',life:1});
+          // Level up check
+          const newLevel=Math.floor(absorbed/8)+1;
+          if(newLevel>level){level=newLevel;showLevelUp();}
+          return false;
+        }
+        else if(c.r>player.r*1.05&&player.camouflaged<=0){dead=true;}
+      }
+      return true;
+    });
+    if(dead){endGame();return;}
+  }
+
+  while(cells.length<20)spawnCell();
+  if(Math.random()<.005&&cells.length<30)spawnCell();
+  parts=parts.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=.95;p.vy*=.95;p.life-=.025;return p.life>0;});
+  floatingTexts=floatingTexts.filter(t=>{t.y-=1.2;t.life-=.02;return t.life>0;});
+
+  // Combo timer
+  if(comboTimer>0){comboTimer--;if(comboTimer===0)combo=0;}
+  const cd=document.getElementById('comboDisplay');
+  if(combo>1){document.getElementById('comboText').textContent=`🔥 ${combo}x COMBO!`;cd.classList.add('show');}
+  else{cd.classList.remove('show');}
+
+  // Joystick movement
+  if(joystickActive){mouse.x=player.x+joystickDX*60;mouse.y=player.y+joystickDY*60;}
+
+  ['camouflage','spore','burst'].forEach(ab=>{
+    const cdEl=document.getElementById('cd-'+ab);
+    if(abCDs[ab]>0){
+      abCDs[ab]-=1/60;
+      const cds={camouflage:8,spore:6,burst:10};
+      cdEl.textContent=Math.ceil(abCDs[ab])+'s';cdEl.classList.remove('hidden');
+      if(abCDs[ab]<=0){abCDs[ab]=0;cdEl.classList.add('hidden');}
+    }
+  });
+
+  document.getElementById('hudScore').textContent=score;
+  document.getElementById('hudBest').textContent=Math.max(bestScore,score);
+  document.getElementById('massBarFill').style.width=Math.min(100,(player.r-10)/50*100)+'%';
+  player.r=Math.min(60,player.r);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,W);
+  const g=ctx.createRadialGradient(W/2,W/2,0,W/2,W/2,W/2);
+  g.addColorStop(0,'#0d1b2a');g.addColorStop(.7,'#091522');g.addColorStop(1,'#050c14');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(W/2,W/2,W/2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(76,201,240,0.04)';ctx.lineWidth=1;
+  for(let i=0;i<W;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,W);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+  ctx.strokeStyle='rgba(76,201,240,0.15)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(W/2,W/2,W/2-2,0,Math.PI*2);ctx.stroke();
+
+  spores.forEach(s=>{
+    if(s.type==='virus'){
+      ctx.save();ctx.shadowColor=s.color;ctx.shadowBlur=15;ctx.strokeStyle=s.color;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.stroke();
+      for(let i=0;i<8;i++){const a=i/8*Math.PI*2;ctx.beginPath();ctx.moveTo(s.x+Math.cos(a)*s.r,s.y+Math.sin(a)*s.r);ctx.lineTo(s.x+Math.cos(a)*(s.r+7),s.y+Math.sin(a)*(s.r+7));ctx.stroke();}
+      ctx.restore();
+    } else {
+      const pulse=Math.sin(s.pulse||0)*.3+.7;
+      ctx.save();ctx.globalAlpha=pulse*.9;ctx.shadowColor=s.color;ctx.shadowBlur=8;ctx.fillStyle=s.color;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r*pulse,0,Math.PI*2);ctx.fill();ctx.restore();
+    }
+  });
+
+  cells.forEach(c=>drawCell(c.x,c.y,c.r,c.color,c.type==='predator',c.camouflaged>0,false));
+  parts.forEach(p=>{ctx.save();ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);ctx.fill();ctx.restore();});
+  drawCell(player.x,player.y,player.r,player.color,false,player.camouflaged>0,true);
+  // Floating score texts
+  floatingTexts.forEach(t=>{ctx.save();ctx.globalAlpha=t.life;ctx.fillStyle=t.color;ctx.shadowColor=t.color;ctx.shadowBlur=8;ctx.font=`bold ${14+combo*2}px 'Baloo 2'`;ctx.textAlign='center';ctx.fillText(t.text,t.x,t.y);ctx.restore();});
+
+  if(player.burstTime>0){
+    ctx.save();ctx.globalAlpha=(player.burstTime/120)*.4;ctx.strokeStyle='#f9c74f';ctx.lineWidth=3;ctx.shadowColor='#f9c74f';ctx.shadowBlur=20;
+    ctx.beginPath();ctx.arc(player.x,player.y,player.r+8,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  ctx.save();ctx.globalCompositeOperation='destination-in';ctx.beginPath();ctx.arc(W/2,W/2,W/2,0,Math.PI*2);ctx.fill();ctx.restore();
+}
+
+function lighten(hex,a){const n=parseInt(hex.slice(1),16);return `rgb(${Math.min(255,((n>>16)&0xff)+a)},${Math.min(255,((n>>8)&0xff)+a)},${Math.min(255,(n&0xff)+a)})`;}
+function darken(hex,a){return lighten(hex,-a);}
+
+function drawCell(x,y,r,color,isPred,isCamo,isPlayer){
+  ctx.save();
+  if(isCamo)ctx.globalAlpha=.25;
+  ctx.shadowColor=color;ctx.shadowBlur=isPlayer?20:isPred?14:8;
+  const g=ctx.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r);
+  g.addColorStop(0,lighten(color,40));g.addColorStop(.6,color);g.addColorStop(1,darken(color,40));
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;ctx.globalAlpha=isCamo?.1:.3;ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.beginPath();ctx.ellipse(x-r*.3,y-r*.3,r*.25,r*.15,0,0,Math.PI*2);ctx.fill();
+  if(isPred&&!isCamo){
+    ctx.globalAlpha=1;ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle=lighten(color,20);ctx.lineWidth=1;
+    for(let i=0;i<6;i++){const a=i/6*Math.PI*2;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r,y+Math.sin(a)*r);ctx.lineTo(x+Math.cos(a)*(r+4),y+Math.sin(a)*(r+4));ctx.stroke();}
+  }
+  if(isPlayer&&!isCamo){ctx.globalAlpha=.6;ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();}
+  ctx.restore();
+}
+
+function useAbility(ab){
+  if(state!=='playing'||abCDs[ab]>0)return;
+  if(ab==='camouflage'){player.camouflaged=180;abCDs[ab]=8;for(let i=0;i<15;i++)parts.push(mkPart(player.x,player.y,'#a8dadc'));}
+  else if(ab==='spore'){
+    abCDs[ab]=6;
+    cells.forEach(c=>{const d=Math.hypot(player.x-c.x,player.y-c.y);if(d<110){const a=Math.atan2(c.y-player.y,c.x-player.x);c.vx+=Math.cos(a)*5;c.vy+=Math.sin(a)*5;if(c.r<player.r)c.r=Math.max(4,c.r-3);}});
+    for(let i=0;i<20;i++)parts.push(mkPart(player.x,player.y,player.color));
+  }
+  else if(ab==='burst'){player.burstTime=120;abCDs[ab]=10;for(let i=0;i<12;i++)parts.push(mkPart(player.x,player.y,'#f9c74f'));}
+}
+
+function showLevelUp(){
+  const b=document.getElementById('levelUpBanner');
+  document.getElementById('levelUpText').textContent=`⬆️ LEVEL ${level}!`;
+  b.classList.add('show');
+  for(let i=0;i<25;i++)parts.push(mkPart(W/2,W/2,'#f9c74f'));
+  setTimeout(()=>b.classList.remove('show'),1500);
+}
+
+function endGame(){
+  state='gameover';clearInterval(mutInterval);cancelAnimationFrame(animId);
+  const elapsed=Math.floor((Date.now()-startTime)/1000);
+  const isNewBest=score>bestScore;
+  if(isNewBest){bestScore=score;localStorage.setItem('sporeWarsBest',score);}
+  document.getElementById('finalScore').textContent=score;
+  document.getElementById('goTime').textContent=elapsed+'s';
+  document.getElementById('goAbsorbed').textContent=absorbed;
+  document.getElementById('goMutations').textContent=mutationCount;
+  document.getElementById('newRecordMsg').style.display=isNewBest?'block':'none';
+  document.getElementById('hudBest').textContent=bestScore;
+  for(let i=0;i<40;i++)parts.push(mkPart(player.x,player.y,player.color));
+  setTimeout(()=>document.getElementById('gameOverScreen').classList.remove('hidden'),1000);
+}
+
+canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();mouse.x=e.clientX-r.left;mouse.y=e.clientY-r.top;});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();mouse.x=e.touches[0].clientX-r.left;mouse.y=e.touches[0].clientY-r.top;},{passive:false});
+
+// Joystick
+const jBase=document.getElementById('joystickBase');
+const jKnob=document.getElementById('joystickKnob');
+let jOrigin={x:0,y:0};
+jBase.addEventListener('touchstart',e=>{
+  e.preventDefault();joystickActive=true;
+  const r=jBase.getBoundingClientRect();
+  jOrigin={x:r.left+r.width/2,y:r.top+r.height/2};
+},{passive:false});
+jBase.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  const dx=t.clientX-jOrigin.x,dy=t.clientY-jOrigin.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const maxD=38;const clamped=Math.min(dist,maxD);
+  joystickDX=dx/dist;joystickDY=dy/dist;
+  jKnob.style.transform=`translate(calc(-50% + ${joystickDX*clamped}px), calc(-50% + ${joystickDY*clamped}px))`;
+},{passive:false});
+jBase.addEventListener('touchend',()=>{
+  joystickActive=false;joystickDX=0;joystickDY=0;
+  jKnob.style.transform='translate(-50%,-50%)';
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='q'||e.key==='Q')useAbility('camouflage');
+  if(e.key==='e'||e.key==='E')useAbility('spore');
+  if(e.key==='r'||e.key==='R')useAbility('burst');
+});
+</script>
+</body>
+</html>
